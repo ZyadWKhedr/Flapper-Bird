@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flappy_bird/game/bird.dart';
@@ -10,9 +11,17 @@ class Pipe extends SpriteComponent
   final double pipeHeight;
   final double pipeWidth;
   final double posY;
-  final double speed;
+  double speed;
 
-  bool passed = false; // ✅ track if bird passed this pipe
+  bool passed = false;
+
+  // Oscillation properties
+  double baseY = 0;
+  double time = 0;
+  double oscillationAmplitude = 0;
+  double oscillationSpeed = 0;
+
+  final Random _random = Random();
 
   Pipe({
     required this.isTopPipe,
@@ -33,6 +42,14 @@ class Pipe extends SpriteComponent
     sprite = Sprite(image);
 
     add(RectangleHitbox());
+    baseY = posY;
+
+    // Randomly oscillate some pipes (not all)
+    if (_random.nextBool()) {
+      oscillationAmplitude = 10 + _random.nextDouble() * 20;
+      oscillationSpeed = 1.5 + _random.nextDouble() * 1.5;
+    }
+
     return super.onLoad();
   }
 
@@ -47,11 +64,22 @@ class Pipe extends SpriteComponent
   @override
   void update(double dt) {
     super.update(dt);
+    time += dt;
 
-    // Move pipe left
-    position.x -= speed * dt;
+    // Dynamic difficulty — based on player score
+    final score = gameRef.score;
+    final difficultyMultiplier = (1 + score / 50).clamp(1.0, 2.5);
+    final adjustedSpeed = speed * difficultyMultiplier;
 
-    // Increment score when bird passes bottom pipe
+    // Move left
+    position.x -= adjustedSpeed * dt;
+
+    // Optional: small vertical oscillation for moving pipes
+    if (oscillationAmplitude > 0) {
+      y = baseY + sin(time * oscillationSpeed) * oscillationAmplitude;
+    }
+
+    // ✅ Increment score when bird passes
     if (!isTopPipe &&
         !passed &&
         position.x + size.x < gameRef.bird.position.x) {
@@ -59,7 +87,7 @@ class Pipe extends SpriteComponent
       gameRef.incrementScore();
     }
 
-    // Remove off-screen pipes
+    // Remove when off-screen
     if (position.x <= -size.x) {
       removeFromParent();
     }
