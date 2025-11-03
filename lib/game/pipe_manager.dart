@@ -40,9 +40,9 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
 
   // ✅ New function: update difficulty based on score
   void updateDifficulty(int score) {
-    // Every 10 points, increase difficulty (up to level 5)
+    // Every 10 points, increase difficulty (up to level 10)
     difficultyLevel = (score ~/ 10) + 1;
-    difficultyLevel = difficultyLevel.clamp(1, 5);
+    difficultyLevel = difficultyLevel.clamp(1, 10);
 
     // Smaller gaps as difficulty increases
     minGapRatio = 0.25 - (0.03 * (difficultyLevel - 1));
@@ -53,6 +53,8 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
   }
 
   void spawnPipes() {
+
+    
     final screenHeight = gameRef.size.y;
     final pipeWidth = 80.0;
 
@@ -70,21 +72,37 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
     final topHeight =
         screenHeight - Constants.groundHeight - gap - bottomHeight;
 
-    final bottomPipe = Pipe(
-      isTopPipe: false,
-      pipeHeight: bottomHeight,
-      pipeWidth: pipeWidth,
-      posY: screenHeight - bottomHeight - Constants.groundHeight,
-      speed: currentSpeed,
-    );
+    final baseY = screenHeight - bottomHeight - Constants.groundHeight;
 
-    final topPipe = Pipe(
-      isTopPipe: true,
-      pipeHeight: topHeight,
-      pipeWidth: pipeWidth,
-      posY: 0,
-      speed: currentSpeed,
-    );
+    final oscillationAmplitude = 15 + random.nextDouble() * 20;
+    final oscillationSpeed = 1.2 + random.nextDouble() * 1.8;
+    final groupPhase = random.nextDouble() * pi * 2; // random start phase
+
+    // Both pipes share the same oscillation parameters
+    final bottomPipe =
+        Pipe(
+            isTopPipe: false,
+            pipeHeight: bottomHeight,
+            pipeWidth: pipeWidth,
+            posY: baseY,
+            speed: currentSpeed,
+          )
+          ..oscillationAmplitude = oscillationAmplitude
+          ..oscillationSpeed = oscillationSpeed
+          ..phase = groupPhase;
+
+    final topPipe =
+        Pipe(
+            isTopPipe: true,
+            pipeHeight: topHeight,
+            pipeWidth: pipeWidth,
+            posY: 0,
+            speed: currentSpeed,
+          )
+          ..oscillationAmplitude = oscillationAmplitude
+          ..oscillationSpeed = oscillationSpeed
+          ..phase = groupPhase;
+          
 
     gameRef.addAll([topPipe, bottomPipe]);
   }

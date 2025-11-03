@@ -12,6 +12,7 @@ class Pipe extends SpriteComponent
   final double pipeWidth;
   final double posY;
   double speed;
+  double phase = 0;
 
   bool passed = false;
 
@@ -92,4 +93,6 @@ class Pipe extends SpriteComponent
       removeFromParent();
     }
   }
+
+  
 }

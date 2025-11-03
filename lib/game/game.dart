@@ -24,7 +24,7 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
   late Score scoreComponent;
 
   double speedMultiplier = 1.0;
-  static const double maxSpeedMultiplier = 2.5; // Prevents too-fast pipes
+  static const double maxSpeedMultiplier = 4.5; // Prevents too-fast pipes
 
   final ValueNotifier<BannerAd?> bannerNotifier = ValueNotifier(null);
   InterstitialAd? interstitialAd;
@@ -173,8 +173,14 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
         actions: [
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
-              resetGame();
+              bannerNotifier.value?.dispose();
+              interstitialAd?.dispose();
+              overlays.clear();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const StartMenu()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.greenAccent[400],
@@ -210,21 +216,16 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
     score = 0;
     isGameOver = false;
     speedMultiplier = 1.0;
+    gameOverCounter = 0;
 
     bird
       ..position = Vector2(Constants.birdStartX, Constants.birdStartY)
       ..velocity = 0.0;
 
-    // Remove old pipes
-    children.whereType<Pipe>().toList().forEach(
-      (pipe) => pipe.removeFromParent(),
-    );
-
-    // Reset managers
+    children.whereType<Pipe>().forEach((pipe) => pipe.removeFromParent());
     pipe.pipeSpawnTimer = 0;
     scoreComponent.updateScore(0);
 
-    // Reset speeds
     pipe.updateSpeed(speedMultiplier);
     background.updateSpeed(speedMultiplier);
     ground.updateSpeed(speedMultiplier);
@@ -237,12 +238,17 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
     score += 1;
     scoreComponent.updateScore(score);
 
+    speedMultiplier = 1 + (score / 50).clamp(0, 1.5);
+    pipe.updateSpeed(speedMultiplier);
+    background.updateSpeed(speedMultiplier);
+    ground.updateSpeed(speedMultiplier);
+
     // Increase pipe difficulty every 10 points
     pipe.updateDifficulty(score);
 
     // You can keep your speedMultiplier logic if you like:
     if (score % 6 == 0 && speedMultiplier < maxSpeedMultiplier) {
-      speedMultiplier += 0.6;
+      speedMultiplier += 1;
       pipe.updateSpeed(speedMultiplier);
       background.updateSpeed(speedMultiplier);
       ground.updateSpeed(speedMultiplier);
@@ -251,21 +257,17 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
   }
 
   void pauseGame() {
-    if (!isGameOver) {
+    if (!isGameOver && !overlays.isActive('PauseMenu')) {
       pauseEngine();
       overlays.add('PauseMenu');
       overlays.remove('pause_button');
-      isPausedNotifier.value = true;
     }
   }
 
   void resumeGame() {
-    if (!isGameOver) {
-      overlays.remove('PauseMenu');
-      overlays.add('pause_button');
-      resumeEngine();
-      isPausedNotifier.value = false;
-    }
+    overlays.remove('PauseMenu');
+    overlays.add('pause_button');
+    resumeEngine();
   }
 
   ValueNotifier<bool> isPausedNotifier = ValueNotifier(false);
