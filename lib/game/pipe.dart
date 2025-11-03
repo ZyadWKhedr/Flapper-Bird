@@ -12,7 +12,6 @@ class Pipe extends SpriteComponent
   final double pipeWidth;
   final double posY;
   double speed;
-  double phase = 0;
 
   bool passed = false;
 
@@ -21,6 +20,7 @@ class Pipe extends SpriteComponent
   double time = 0;
   double oscillationAmplitude = 0;
   double oscillationSpeed = 0;
+  bool oscillationEnabled = false;
 
   final Random _random = Random();
 
@@ -45,11 +45,9 @@ class Pipe extends SpriteComponent
     add(RectangleHitbox());
     baseY = posY;
 
-    // Randomly oscillate some pipes (not all)
-    if (_random.nextBool()) {
-      oscillationAmplitude = 10 + _random.nextDouble() * 20;
-      oscillationSpeed = 1.5 + _random.nextDouble() * 1.5;
-    }
+    // Predefine random oscillation pattern (but disabled initially)
+    oscillationAmplitude = 10 + _random.nextDouble() * 20;
+    oscillationSpeed = 1.5 + _random.nextDouble() * 1.5;
 
     return super.onLoad();
   }
@@ -67,16 +65,18 @@ class Pipe extends SpriteComponent
     super.update(dt);
     time += dt;
 
-    // Dynamic difficulty — based on player score
     final score = gameRef.score;
-    final difficultyMultiplier = (1 + score / 50).clamp(1.0, 2.5);
-    final adjustedSpeed = speed * difficultyMultiplier;
 
-    // Move left
-    position.x -= adjustedSpeed * dt;
+    // Enable oscillation only after reaching score 30
+    if (score >= 30) {
+      oscillationEnabled = true;
+    }
 
-    // Optional: small vertical oscillation for moving pipes
-    if (oscillationAmplitude > 0) {
+    // ✅ Use speed from PipeManager directly (no multiplier)
+    position.x -= speed * dt;
+
+    // Oscillation only after 30
+    if (oscillationEnabled) {
       y = baseY + sin(time * oscillationSpeed) * oscillationAmplitude;
     }
 
@@ -88,11 +88,9 @@ class Pipe extends SpriteComponent
       gameRef.incrementScore();
     }
 
-    // Remove when off-screen
+    // Remove pipe when off-screen
     if (position.x <= -size.x) {
       removeFromParent();
     }
   }
-
-  
 }

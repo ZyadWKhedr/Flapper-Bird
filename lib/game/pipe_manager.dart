@@ -40,69 +40,68 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
 
   // ✅ New function: update difficulty based on score
   void updateDifficulty(int score) {
-    // Every 10 points, increase difficulty (up to level 10)
-    difficultyLevel = (score ~/ 10) + 1;
-    difficultyLevel = difficultyLevel.clamp(1, 10);
+    // Increase difficulty faster — every 5 points
+    difficultyLevel = (score ~/ 5) + 1;
+    difficultyLevel = difficultyLevel.clamp(1, 20);
 
-    // Smaller gaps as difficulty increases
-    minGapRatio = 0.25 - (0.03 * (difficultyLevel - 1));
-    maxGapRatio = 0.4 - (0.05 * (difficultyLevel - 1));
+    // Narrower gaps each level
+    minGapRatio = (0.28 - (0.015 * (difficultyLevel - 1))).clamp(0.12, 0.27);
+    maxGapRatio = (0.42 - (0.02 * (difficultyLevel - 1))).clamp(0.18, 0.42);
 
-    // Slightly faster pipe movement
-    updateSpeed(1.0 + (0.15 * (difficultyLevel - 1)));
+    // Faster pipes per level
+    currentSpeed = basePipeSpeed * (1 + (difficultyLevel - 1) * 0.2);
+    pipeSpawnInterval = (gameRef.size.x * 0.7) / currentSpeed;
   }
 
   void spawnPipes() {
-
-    
     final screenHeight = gameRef.size.y;
     final pipeWidth = 80.0;
 
+    // Calculate dynamic gap based on difficulty (smaller gap = harder)
     final minGap = screenHeight * minGapRatio;
     final maxGap = screenHeight * maxGapRatio;
     final gap = minGap + random.nextDouble() * (maxGap - minGap);
 
+    // Ensure gap never gets absurdly small (safe minimum)
+    final safeGap = gap.clamp(screenHeight * 0.18, screenHeight * 0.5);
+
+    // Define minimum and maximum bottom pipe height
     final minPipeHeight = 50.0;
     final maxBottomHeight =
-        screenHeight - Constants.groundHeight - gap - minPipeHeight;
+        screenHeight - Constants.groundHeight - safeGap - minPipeHeight;
 
+    // Random bottom pipe height but more centered — less randomness at high difficulty
     final bottomHeight =
-        minPipeHeight + random.nextDouble() * (maxBottomHeight - minPipeHeight);
+        minPipeHeight +
+        (random.nextDouble() * (maxBottomHeight - minPipeHeight)) *
+            (1.0 - (difficultyLevel * 0.05)).clamp(0.4, 1.0);
 
     final topHeight =
-        screenHeight - Constants.groundHeight - gap - bottomHeight;
+        screenHeight - Constants.groundHeight - safeGap - bottomHeight;
 
     final baseY = screenHeight - bottomHeight - Constants.groundHeight;
 
-    final oscillationAmplitude = 15 + random.nextDouble() * 20;
-    final oscillationSpeed = 1.2 + random.nextDouble() * 1.8;
-    final groupPhase = random.nextDouble() * pi * 2; // random start phase
+    // Add slight horizontal offset randomness at higher difficulty (optional)
+    final horizontalOffset = difficultyLevel >= 5
+        ? random.nextDouble() * 20 - 10
+        : 0.0;
 
-    // Both pipes share the same oscillation parameters
-    final bottomPipe =
-        Pipe(
-            isTopPipe: false,
-            pipeHeight: bottomHeight,
-            pipeWidth: pipeWidth,
-            posY: baseY,
-            speed: currentSpeed,
-          )
-          ..oscillationAmplitude = oscillationAmplitude
-          ..oscillationSpeed = oscillationSpeed
-          ..phase = groupPhase;
+    // Both pipes share same speed
+    final bottomPipe = Pipe(
+      isTopPipe: false,
+      pipeHeight: bottomHeight,
+      pipeWidth: pipeWidth,
+      posY: baseY + horizontalOffset,
+      speed: currentSpeed,
+    );
 
-    final topPipe =
-        Pipe(
-            isTopPipe: true,
-            pipeHeight: topHeight,
-            pipeWidth: pipeWidth,
-            posY: 0,
-            speed: currentSpeed,
-          )
-          ..oscillationAmplitude = oscillationAmplitude
-          ..oscillationSpeed = oscillationSpeed
-          ..phase = groupPhase;
-          
+    final topPipe = Pipe(
+      isTopPipe: true,
+      pipeHeight: topHeight,
+      pipeWidth: pipeWidth,
+      posY: horizontalOffset,
+      speed: currentSpeed,
+    );
 
     gameRef.addAll([topPipe, bottomPipe]);
   }

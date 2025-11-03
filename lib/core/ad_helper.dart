@@ -2,7 +2,7 @@ import 'dart:io';
 
 class AdHelper {
   /// Change this to `false` before publishing to Play Store
-  static bool get isTestMode => true;
+  static bool get isTestMode => false;
 
   /// Banner Ad Unit ID
   static String get bannerAdUnitId {

@@ -26,16 +26,13 @@ class _PauseMenuState extends State<PauseMenu> {
       request: const AdRequest(),
       size: AdSize.banner,
       listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          setState(() => _pauseBanner = ad as BannerAd);
-        },
+        onAdLoaded: (ad) => setState(() => _pauseBanner = ad as BannerAd),
         onAdFailedToLoad: (ad, error) {
           debugPrint('❌ Pause banner failed: ${error.message}');
           ad.dispose();
         },
       ),
-    );
-    ad.load();
+    )..load();
   }
 
   @override
@@ -46,12 +43,13 @@ class _PauseMenuState extends State<PauseMenu> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Align(
+      alignment: Alignment.center,
       child: Container(
-        width: 260,
-        padding: const EdgeInsets.all(20),
+        width: 280,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.8),
+          color: Colors.black.withOpacity(0.85),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -61,15 +59,13 @@ class _PauseMenuState extends State<PauseMenu> {
               'Paused',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                widget.game.resumeGame();
-              },
+              onPressed: widget.game.resumeGame,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.greenAccent[400],
                 shape: RoundedRectangleBorder(
@@ -82,7 +78,7 @@ class _PauseMenuState extends State<PauseMenu> {
             ElevatedButton(
               onPressed: () {
                 widget.game.overlays.remove('PauseMenu');
-                Navigator.pop(context);
+                widget.game.resetGame();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
@@ -93,6 +89,21 @@ class _PauseMenuState extends State<PauseMenu> {
               child: const Text('Exit', style: TextStyle(fontSize: 18)),
             ),
             const SizedBox(height: 20),
+            if (_pauseBanner != null)
+              Column(
+                children: [
+                  // const Divider(
+                  //   color: Colors.white24,
+                  //   thickness: 0.6,
+                  //   height: 10,
+                  // ),
+                  // SizedBox(
+                  //   width: _pauseBanner!.size.width.toDouble(),
+                  //   height: _pauseBanner!.size.height.toDouble(),
+                  //   child: AdWidget(ad: _pauseBanner!),
+                  // ),
+                ],
+              ),
           ],
         ),
       ),
