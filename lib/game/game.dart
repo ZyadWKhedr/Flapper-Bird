@@ -100,17 +100,26 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
   void onTap() => bird.jump();
 
   // 🧩 Game over logic
+
+  int gameOverCounter = 0;
+
   void gameOver() {
     if (isGameOver) return;
+
     isGameOver = true;
     pauseEngine();
 
-    if (_isInterstitialAdReady && interstitialAd != null) {
+    gameOverCounter++;
+
+    // ✅ Show interstitial only every 3rd game over
+    final shouldShowAd = gameOverCounter % 3 == 0;
+
+    if (shouldShowAd && _isInterstitialAdReady && interstitialAd != null) {
       interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
         onAdDismissedFullScreenContent: (ad) {
           ad.dispose();
           interstitialAd = null;
-          loadInterstitialAd(); // Preload next ad
+          loadInterstitialAd(); // preload next ad
           _showGameOverDialog();
         },
         onAdFailedToShowFullScreenContent: (ad, error) {
@@ -228,9 +237,12 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
     score += 1;
     scoreComponent.updateScore(score);
 
-    // Increase game speed every 6 points
+    // Increase pipe difficulty every 10 points
+    pipe.updateDifficulty(score);
+
+    // You can keep your speedMultiplier logic if you like:
     if (score % 6 == 0 && speedMultiplier < maxSpeedMultiplier) {
-      speedMultiplier += 0.2;
+      speedMultiplier += 0.6;
       pipe.updateSpeed(speedMultiplier);
       background.updateSpeed(speedMultiplier);
       ground.updateSpeed(speedMultiplier);
@@ -243,6 +255,7 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
       pauseEngine();
       overlays.add('PauseMenu');
       overlays.remove('pause_button');
+      isPausedNotifier.value = true;
     }
   }
 
@@ -251,6 +264,11 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
       overlays.remove('PauseMenu');
       overlays.add('pause_button');
       resumeEngine();
+      isPausedNotifier.value = false;
     }
   }
+
+  ValueNotifier<bool> isPausedNotifier = ValueNotifier(false);
+
+  void togglePause() => isPausedNotifier.value = !isPausedNotifier.value;
 }

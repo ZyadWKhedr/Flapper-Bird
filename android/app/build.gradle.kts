@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.flappy_bird"
+    namespace = "com.flapperbird"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,13 +31,30 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.flappy_bird"
+        applicationId = "com.flapperbird"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias", "key0")
+            keyPassword = keystoreProperties.getProperty("keyPassword", "")
+            // Resolve storeFile: first try relative to module (android/app), then relative to android/ (keystoreProperties file parent)
+            val configuredStoreFile = keystoreProperties.getProperty("storeFile", "key.jks")
+            var resolvedStoreFile = file(configuredStoreFile)
+            if (!resolvedStoreFile.exists()) {
+                // try relative to the android/ folder (where key.properties usually lives)
+                val parentDir = keystorePropertiesFile.parentFile
+                resolvedStoreFile = parentDir?.let { File(it, configuredStoreFile) } ?: resolvedStoreFile
+            }
+            storeFile = resolvedStoreFile
+            storePassword = keystoreProperties.getProperty("storePassword", "")
+        }
     }
 
     buildTypes {
@@ -48,15 +65,6 @@ android {
             } catch (e: Exception) {
                 signingConfigs.getByName("debug")
             }
-        }
-    }
-
-    signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias", "key0")
-            keyPassword = keystoreProperties.getProperty("keyPassword", "")
-            storeFile = file(keystoreProperties.getProperty("storeFile", "key.jks"))
-            storePassword = keystoreProperties.getProperty("storePassword", "")
         }
     }
 }

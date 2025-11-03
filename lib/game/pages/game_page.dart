@@ -1,16 +1,33 @@
 import 'package:flame/game.dart';
 import 'package:flappy_bird/game/game.dart';
+import 'package:flappy_bird/game/menus/pause_menu.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../core/ad_helper.dart';
 
-class PauseMenu extends StatelessWidget {
-  final FlappyBirdGame game;
-
-  const PauseMenu({super.key, required this.game});
+class GamePage extends StatefulWidget {
+  const GamePage({super.key});
 
   @override
+  State<GamePage> createState() => _GamePageState();
+}
+
+class _GamePageState extends State<GamePage> {
+  late FlappyBirdGame game;
+
+  @override
+  void initState() {
+    super.initState();
+    game = FlappyBirdGame();
+  }
+
+  @override
+  void dispose() {
+    game.bannerNotifier.value?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,7 +40,7 @@ class PauseMenu extends StatelessWidget {
             },
           ),
 
-          // ✅ Only show banner when PauseMenu overlay is active
+          // ✅ Only show banner when paused
           ValueListenableBuilder<bool>(
             valueListenable: game.isPausedNotifier,
             builder: (context, isPaused, _) {
