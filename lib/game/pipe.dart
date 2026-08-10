@@ -5,6 +5,8 @@ import 'package:flame/components.dart';
 import 'package:flappy_bird/game/bird.dart';
 import 'package:flappy_bird/game/game.dart';
 
+import '../core/constants.dart';
+
 class Pipe extends SpriteComponent
     with HasGameRef<FlappyBirdGame>, CollisionCallbacks {
   final bool isTopPipe;
@@ -37,10 +39,22 @@ class Pipe extends SpriteComponent
     position = Vector2(gameRef.size.x, posY);
     size = Vector2(pipeWidth, pipeHeight);
 
-    final image = await gameRef.images.load(
-      isTopPipe ? 'top_pipe.png' : 'bottom_pipe.png',
-    );
-    sprite = Sprite(image);
+    final bgType = gameRef.background.currentBg;
+    final useRed = bgType == 'city' || bgType == 'purple' || bgType == 'pink';
+
+    if (useRed) {
+      final image = await gameRef.images.load(AppImages.redPipe);
+      sprite = Sprite(image);
+      if (isTopPipe) {
+        flipVertically();
+        position.y += pipeHeight;
+      }
+    } else {
+      final image = await gameRef.images.load(
+        isTopPipe ? AppImages.topPipe : AppImages.bottomPipe,
+      );
+      sprite = Sprite(image);
+    }
 
     add(RectangleHitbox());
     baseY = posY;
@@ -55,7 +69,9 @@ class Pipe extends SpriteComponent
   @override
   void onCollision(Set<Vector2> intersectionPoints, PositionComponent other) {
     if (other is Bird) {
-      gameRef.gameOver();
+      if (!other.isInvulnerable) {
+        gameRef.gameOver();
+      }
     }
     super.onCollision(intersectionPoints, other);
   }
@@ -75,9 +91,21 @@ class Pipe extends SpriteComponent
     // ✅ Use speed from PipeManager directly (no multiplier)
     position.x -= speed * dt;
 
-    // Oscillation only after 30
+    // Oscillation only after 30 (non-floating implementation)
     if (oscillationEnabled) {
-      y = baseY + sin(time * oscillationSpeed) * oscillationAmplitude;
+      final bgType = gameRef.background.currentBg;
+      final useRed = bgType == 'city' || bgType == 'purple' || bgType == 'pink';
+      final offset = sin(time * oscillationSpeed) * oscillationAmplitude;
+
+      if (isTopPipe) {
+        // Anchor top pipe to the top of screen and change its height
+        size.y = pipeHeight + offset;
+        position.y = useRed ? size.y : 0;
+      } else {
+        // Anchor bottom pipe to ground by adjusting both position and height
+        position.y = baseY + offset;
+        size.y = (gameRef.size.y - Constants.groundHeight) - position.y;
+      }
     }
 
     // ✅ Increment score when bird passes

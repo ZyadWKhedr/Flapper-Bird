@@ -1,7 +1,9 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flappy_bird/game/menus/game_over_menu.dart';
 import 'package:flutter/material.dart';
+import 'package:flame/effects.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart';
 
@@ -14,26 +16,32 @@ import 'bird.dart';
 import 'ground.dart';
 import 'pipe.dart';
 import 'pipe_manager.dart';
-import 'score.dart';
+import 'components/power_up.dart';
+import 'components/weather_effect.dart';
+import 'components/rainbow_trail.dart';
+import 'components/balloon.dart';
 import 'menus/pause_menu.dart';
 import 'menus/start_menu.dart';
-import 'widgets/pause_button.dart';
 
 class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
-  late Bird bird;
-  late Background background;
-  late Ground ground;
-  late PipeManager pipe;
-  late Score scoreComponent;
+  late final Background background;
+  late final Bird bird;
+  late final PipeManager pipe;
+  late final Ground ground;
+  late final WeatherManager weatherManager;
+  late final RainbowTrail rainbowTrail;
 
-  double speedMultiplier = 2.0;
+  double speedMultiplier = 1.0;
   static const double maxSpeedMultiplier = 8.5;
 
   final ValueNotifier<BannerAd?> bannerNotifier = ValueNotifier(null);
+  final ValueNotifier<int> scoreNotifier = ValueNotifier(0);
+  final ValueNotifier<int> balloonsNotifier = ValueNotifier(0);
   InterstitialAd? interstitialAd;
   bool _isInterstitialReady = false;
   bool isGameOver = false;
   int score = 0;
+  int balloonsPopped = 0;
   int _gameOverCounter = 0;
   // 🧭 Pause notifier — used by UI (e.g. GamePage) to detect pause state
   final ValueNotifier<bool> isPausedNotifier = ValueNotifier(false);
@@ -44,13 +52,12 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
       background = Background(),
       pipe = PipeManager(),
       ground = Ground(),
-      scoreComponent = Score(),
       bird = Bird(),
+      weatherManager = WeatherManager()..priority = 90, // render on top of background but below text
+      rainbowTrail = RainbowTrail(),
     ]);
 
     overlays.addEntry('PauseMenu', (_, game) => PauseMenu(game: this));
-    overlays.addEntry('pause_button', (_, game) => PauseButton(game: this));
-    overlays.add('pause_button');
     overlays.addEntry(
       'GameOverMenu',
       (_, game) => GameOverMenu(game: this, score: score),
@@ -113,15 +120,41 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
   // -------------------------- GAME OVER ----------------------------
 
   void gameOver() {
-    pauseEngine();
+    if (isGameOver) return;
+    isGameOver = true;
+
+    if (HighScoreService.isMusicEnabled()) {
+      AudioPlayer().play(AssetSource('audio/audio_hit.wav'), mode: PlayerMode.lowLatency);
+      Future.delayed(const Duration(milliseconds: 160), () {
+        AudioPlayer().play(AssetSource('audio/audio_die.wav'), mode: PlayerMode.lowLatency);
+      });
+    }
+
+    // 📳 Shake camera viewport using modern Flame effects on viewfinder
+    camera.viewfinder.add(
+      MoveEffect.by(
+        Vector2(10, 10),
+        EffectController(
+          duration: 0.05,
+          alternate: true,
+          repeatCount: 3,
+        ),
+      ),
+    );
+
+    // ⛔ Freeze all moving objects instantly so the screen doesn't slide during shake
+    speedMultiplier = 0.0;
+    pipe.updateSpeed(0);
+    ground.updateSpeed(0);
+    background.updateSpeed(0);
+
     HighScoreService.saveHighScore(score);
-
+    HighScoreService.addBalloons(balloonsPopped);
     overlays.remove('PauseMenu');
-
     _gameOverCounter++;
     debugPrint('💀 Game over count: $_gameOverCounter');
 
-    // 🎯 Show an interstitial ad every 3rd game over only
+    // 🎯 Present the game over options instantly for maximum snappiness
     if ((_gameOverCounter % 3) == 0 &&
         _isInterstitialReady &&
         interstitialAd != null) {
@@ -131,16 +164,24 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
           ad.dispose();
           _loadInterstitialAd(); // Preload the next ad
           overlays.add('GameOverMenu'); // Show Game Over screen after ad closes
+          pauseEngine();
         },
         onAdFailedToShowFullScreenContent: (ad, error) {
           ad.dispose();
           _loadInterstitialAd();
           overlays.add('GameOverMenu');
+          pauseEngine();
         },
       );
       interstitialAd!.show();
     } else {
       overlays.add('GameOverMenu');
+      // Delay pausing the engine slightly so the camera shake effect runs to completion
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (isGameOver) {
+          pauseEngine();
+        }
+      });
     }
   }
 
@@ -148,20 +189,36 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
 
   void resetGame() {
     score = 0;
+    balloonsPopped = 0;
     isGameOver = false;
     speedMultiplier = 1.0;
 
+    // Revert to permanent skin selection after 1 game
+    HighScoreService.clearTempBird();
+
     bird
       ..position = Vector2(Constants.birdStartX, Constants.birdStartY)
-      ..velocity = 0;
+      ..velocity = 0
+      ..isInvulnerable = false
+      ..isShrunk = false
+      ..activePowerUp = null
+      ..updateSkin();
 
     children.whereType<Pipe>().forEach((pipe) => pipe.removeFromParent());
+    children.whereType<PowerUp>().forEach((p) => p.removeFromParent());
+    children.whereType<Balloon>().forEach((b) => b.removeFromParent());
+    
     pipe
       ..pipeSpawnTimer = 0
+      ..resetSpawnTracker()
       ..updateSpeed(speedMultiplier);
 
-    scoreComponent.updateScore(0);
-    background.updateSpeed(speedMultiplier);
+    weatherManager.randomizeWeather();
+
+    scoreNotifier.value = 0;
+    balloonsNotifier.value = 0;
+    background.updateBackgroundForScore(0);
+    background.updateSpeed(speedMultiplier * 0.4); // 0.4x speed for parallax
     ground.updateSpeed(speedMultiplier);
 
     resumeEngine();
@@ -169,19 +226,29 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
 
   // -------------------------- SCORE & DIFFICULTY ----------------------------
 
+  void incrementBalloonsPopped() {
+    balloonsPopped += 1;
+    balloonsNotifier.value = balloonsPopped;
+  }
+
   void incrementScore() {
     score += 1;
-    scoreComponent.updateScore(score);
+    scoreNotifier.value = score;
 
-    // Smooth continuous scaling instead of jumps
-    speedMultiplier = 1 + (score / 80).clamp(0, 2.0);
+    // Shift weather pattern dynamically every 15 points
+    if (score > 0 && score % 15 == 0) {
+      weatherManager.randomizeWeather();
+    }
 
-    // Apply to all moving elements
+    // Increase speed gradually after 5 scores
+    double effectiveScore = (score - 5).clamp(0, score).toDouble();
+    speedMultiplier = 1.0 + (effectiveScore / 80).clamp(0, 2.0);
+
+    // Apply to all moving elements (with background moving slower for parallax)
     pipe.updateSpeed(speedMultiplier);
-    background.updateSpeed(speedMultiplier * 1.1); // slight boost for realism
-    ground.updateSpeed(
-      speedMultiplier * 1.25,
-    ); // make ground scroll faster for intensity
+    background.updateSpeed(speedMultiplier * 0.4); // 0.4x speed for parallax
+    background.updateBackgroundForScore(score); // dynamically switch backgrounds
+    ground.updateSpeed(speedMultiplier);
 
     // Update difficulty parameters only (gap, not speed)
     pipe.updateDifficulty(score);
@@ -193,14 +260,12 @@ class FlappyBirdGame extends FlameGame with TapDetector, HasCollisionDetection {
     if (!isGameOver && !overlays.isActive('PauseMenu')) {
       pauseEngine();
       overlays.add('PauseMenu');
-      overlays.remove('pause_button');
       isPausedNotifier.value = true; // ✅ tell UI game is paused
     }
   }
 
   void resumeGame() {
     overlays.remove('PauseMenu');
-    overlays.add('pause_button');
     resumeEngine();
     isPausedNotifier.value = false; // ✅ tell UI game resumed
   }

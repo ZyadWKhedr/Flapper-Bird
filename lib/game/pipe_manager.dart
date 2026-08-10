@@ -3,6 +3,9 @@ import 'package:flame/components.dart';
 import 'package:flappy_bird/core/constants.dart';
 import 'package:flappy_bird/game/game.dart';
 import 'package:flappy_bird/game/pipe.dart';
+import 'package:flappy_bird/game/components/power_up.dart';
+
+import 'package:flappy_bird/game/components/balloon.dart';
 
 class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
   double pipeSpawnTimer = 0;
@@ -16,6 +19,11 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
   int difficultyLevel = 1;
   double minGapRatio = 0.25;
   double maxGapRatio = 0.4;
+  int _lastSpawnedPowerUpScore = -1;
+
+  void resetSpawnTracker() {
+    _lastSpawnedPowerUpScore = -1;
+  }
 
   @override
   Future<void> onLoad() async {
@@ -47,10 +55,6 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
     // Narrower gaps each level
     minGapRatio = (0.28 - (0.015 * (difficultyLevel - 1))).clamp(0.12, 0.27);
     maxGapRatio = (0.42 - (0.02 * (difficultyLevel - 1))).clamp(0.18, 0.42);
-
-    // Faster pipes per level
-    currentSpeed = basePipeSpeed * (1 + (difficultyLevel - 1) * 0.2);
-    pipeSpawnInterval = (gameRef.size.x * 0.7) / currentSpeed;
   }
 
   void spawnPipes() {
@@ -104,5 +108,32 @@ class PipeManager extends Component with HasGameRef<FlappyBirdGame> {
     );
 
     gameRef.addAll([topPipe, bottomPipe]);
+
+    // Spawn power-up exactly at score 20, and every 10 points after 20 (30, 40, 50, etc.)
+    final score = gameRef.score;
+    final isMilestone = (score == 20 || (score > 20 && (score - 20) % 10 == 0));
+
+    if (isMilestone && _lastSpawnedPowerUpScore != score) {
+      _lastSpawnedPowerUpScore = score;
+      final yCenter = topHeight + safeGap / 2;
+      final type = random.nextBool() ? PowerUpType.shield : PowerUpType.shrink;
+
+      final powerUp = PowerUp(
+        type: type,
+        speed: currentSpeed,
+        position: Vector2(gameRef.size.x + pipeWidth / 2, yCenter),
+      );
+      gameRef.add(powerUp);
+    }
+
+    // Spawn destructible balloon obstacles with a 35% probability in the sky
+    if (random.nextDouble() < 0.35) {
+      final yPos = 100.0 + random.nextDouble() * (screenHeight - Constants.groundHeight - 200.0);
+      final balloon = Balloon(
+        position: Vector2(gameRef.size.x + pipeWidth * 1.6, yPos),
+        speed: currentSpeed,
+      );
+      gameRef.add(balloon);
+    }
   }
 }

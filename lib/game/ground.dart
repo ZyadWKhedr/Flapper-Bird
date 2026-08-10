@@ -15,7 +15,7 @@ class Ground extends SpriteComponent
   @override
   Future<void> onLoad() async {
     // Load sprite from the real game instance
-    sprite = await gameRef.loadSprite('ground.png');
+    sprite = await gameRef.loadSprite(AppImages.ground);
 
     // Set initial size based on the game screen width
     size = Vector2(gameRef.size.x * 2, Constants.groundHeight);
@@ -33,7 +33,7 @@ class Ground extends SpriteComponent
     super.update(dt);
 
     // Move ground to the left
-    position.x -= Constants.groundScrollingSpeed * dt;
+    position.x -= currentSpeed * dt;
 
     // Loop ground for infinite scroll
     if (position.x <= -gameRef.size.x) {

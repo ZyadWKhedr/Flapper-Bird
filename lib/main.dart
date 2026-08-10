@@ -1,4 +1,4 @@
-import 'package:flappy_bird/game/menus/start_menu.dart';
+import 'package:flappy_bird/core/app_router.dart';
 import 'package:flappy_bird/core/services/high_score_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -19,7 +19,8 @@ class MyApp extends StatelessWidget {
       title: 'Flapper Bird',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
-      home: const StartMenu(),
+      initialRoute: AppRouter.splash,
+      onGenerateRoute: AppRouter.generateRoute,
     );
   }
 }

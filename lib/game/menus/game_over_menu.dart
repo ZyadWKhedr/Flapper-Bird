@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flappy_bird/core/ad_helper.dart';
+import 'package:flappy_bird/core/constants.dart';
 import 'package:flappy_bird/core/services/high_score_service.dart';
-import 'package:flappy_bird/game/menus/start_menu.dart';
 import 'package:flappy_bird/game/game.dart';
 
 class GameOverMenu extends StatefulWidget {
@@ -17,6 +18,7 @@ class GameOverMenu extends StatefulWidget {
 
 class _GameOverMenuState extends State<GameOverMenu> {
   BannerAd? _gameOverBanner;
+  bool _copied = false;
 
   @override
   void initState() {
@@ -32,15 +34,20 @@ class _GameOverMenuState extends State<GameOverMenu> {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {
-          setState(() => _gameOverBanner = ad as BannerAd);
-          debugPrint('✅ Game Over banner loaded.');
+          if (mounted) {
+            setState(() => _gameOverBanner = ad as BannerAd);
+            debugPrint('✅ Game Over banner loaded.');
+          } else {
+            ad.dispose();
+          }
         },
         onAdFailedToLoad: (ad, error) {
           debugPrint('❌ Game Over banner failed: ${error.message}');
           ad.dispose();
         },
       ),
-    )..load();
+    );
+    ad.load();
   }
 
   @override
@@ -57,10 +64,22 @@ class _GameOverMenuState extends State<GameOverMenu> {
 
   void _exitToMenu() {
     widget.game.overlays.remove('GameOverMenu');
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const StartMenu()),
-    );
+    Navigator.of(context).pop();
+  }
+
+  void _shareScore() {
+    final text = 'I just scored ${widget.score} in Flapper Bird! Can you beat me?';
+    Clipboard.setData(ClipboardData(text: text));
+    setState(() {
+      _copied = true;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _copied = false;
+        });
+      }
+    });
   }
 
   // -------------------- UI --------------------
@@ -74,61 +93,98 @@ class _GameOverMenuState extends State<GameOverMenu> {
         Align(
           alignment: Alignment.center,
           child: Container(
-            width: 300,
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            width: 290,
+            padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 20),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.85),
-              borderRadius: BorderRadius.circular(20),
+              color: Colors.black.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.amberAccent.withOpacity(0.3), width: 1.5),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Game Over',
-                  style: TextStyle(
-                    color: Colors.amberAccent,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Image.asset(
+                  AppImages.flutterPath(AppImages.gameover),
+                  height: 38,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 Text(
-                  'Score: ${widget.score}',
-                  style: const TextStyle(color: Colors.white, fontSize: 20),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'High Score: $highScore',
+                  'SCORE: ${widget.score}',
                   style: const TextStyle(
-                    color: Colors.amberAccent,
-                    fontSize: 22,
+                    color: Colors.white, 
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _playAgain,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.greenAccent[400],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Play Again',
-                    style: TextStyle(fontSize: 18),
+                const SizedBox(height: 4),
+                Text(
+                  'BEST RECORD: $highScore',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: _exitToMenu,
+                const SizedBox(height: 24),
+
+                // Share Score Button (Full width above game actions)
+                ElevatedButton.icon(
+                  onPressed: _shareScore,
+                  icon: Icon(_copied ? Icons.check_circle : Icons.share, size: 16, color: Colors.black),
+                  label: Text(
+                    _copied ? 'COPIED SNIPPET!' : 'SHARE SCORE',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black),
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
+                    backgroundColor: Colors.amberAccent,
+                    minimumSize: const Size(double.infinity, 44),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Exit', style: TextStyle(fontSize: 18)),
+                ),
+                const SizedBox(height: 12),
+
+                // Game Action Controls Row (Play Again and Exit side by side)
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _playAgain,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.greenAccent[700],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'PLAY',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _exitToMenu,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[850],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'EXIT',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
